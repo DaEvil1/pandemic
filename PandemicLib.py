@@ -7,8 +7,19 @@ from Pandemic_config import *
 from collections import Counter
 
 class Pandemic:
+    not_handle = ("healthy", "dead", "immune")
     node_data = {"healthy" : {"color" : HEALTHY_COLOR, "speed" : HEALTHY_SPEED, "radius" : HEALTHY_RADIUS, "amount" : HEALTHY_NODES},
-             "infected" : {"color" : SICK_COLOR, "speed" : SICK_SPEED, "radius" : SICK_RADIUS, "amount" : SICK_NODES}}
+                 "infected" : {"color" : INFECTED_COLOR, "speed" : INFECTED_SPEED, "radius" : INFECTED_RADIUS, "amount" : INFECTED_NODES},
+                 "immune" : {"color" : IMMUNE_COLOR, "speed" : IMMUNE_SPEED, "radius" : IMMUNE_RADIUS, "amount" : IMMUNE_NODES}
+             }
+
+    def _node_list(self, status):
+        gen_list = []
+        node_status = self.node_status
+        for i in range(len(node_status)):
+            if node_status[i]["status"] == status:
+                gen_list.append(i)
+        return gen_list
 
     def _generateNodes(self, w, h, node_spec, status):
         for _ in range(node_spec["amount"]):
@@ -19,7 +30,6 @@ class Pandemic:
             xs = math.cos(angle)*i_speed
             ys = math.sin(angle)*i_speed
             color = node_spec["color"]
-            #color = [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
             pos = [random.randint(0, w), random.randint(0, h)]
             speed = (xs, ys)
             radius = node_spec["radius"]
@@ -28,7 +38,8 @@ class Pandemic:
             if random.random() > RISK_GROUP_PORTION:
                 risk_group = False
             self.node_status.append({"status" : status, "days sick" : 0, "risk group" : risk_group, 
-                                     "serious" : False, "in treatment" : False, "days in treatment" : 0})
+                                     "serious" : False, "in treatment" : False, "days in treatment" : 0, 
+                                     "current seed" : 0})
             self.status_count[status] += 1
             
 
@@ -36,160 +47,151 @@ class Pandemic:
     
     def __init__(self, w, h, caption):
         self.node_status = []
-        self.status_count = {}
         self.d_time = 1.0 / WIN_FPS
         self.caption = caption
         self.win = (w, h)
-        #self.infected = []
         self.nodes = MultiNodes.MultiNodes((w, h))
         self.nodes.list_overlaps = True
         self.nodes.active_collisions = COLLISIONS
         self.nodes.draw_collisions = DRAW_COLLISIONS
-        self.status_count["healthy"] = 0
+        counts = "healthy", "infected", "dead", "immune", "days", "frames", "serious in treatment", \
+                "serious without treatment", "serious total",
+                 
+        self.status_count = {i: 0 for i in counts}
         self._generateNodes(w, h, self.node_data["healthy"], "healthy")
-        self.status_count["infected"] = 0
         self._generateNodes(w, h, self.node_data["infected"], "infected")
-        self.status_count["dead"] = 0
-        self.status_count["immune"] = 0
-        self.status_count["days"] = 0
-        self.status_count["frames"] = 0
-        self.status_count["serious in treatment"] = 0
-        self.status_count["serious without treatment"] = 0
-        self.status_count["serious total"] = 0
 
-    def _infection(self, overlaps):
+    def _update_current_seed(self, i):
+        i["current seed"] = random.random()
+    
+    def _update_serious(self, i, j):
+        isrisk = i["risk group"]
+        seed = i["current seed"]
+        if not i["serious"] and i["status"] == "infected":
+            if seed < SERIOUSLY_SICK_CHANCE*(isrisk == False) + SERIOUSLY_SICK_CHANCE_RISK_GROUP*isrisk:
+                i["serious"] = True
+                self.status_count["serious total"] += 1
+                self.nodes.nodes[j].data["color"] = SERIOUSLY_INFECTED_COLOR
+                self.nodes.nodes[j].data["speed"] = SERIOUS_SPEED
+    
+    def _update_treatment_status(self, i, j):
+        serious = i["serious"]
+        in_treatment = i["in treatment"]
+        if serious and not in_treatment:
+            if self.status_count["serious in treatment"] < TREATMENT_SPOTS:
+                self.status_count["serious in treatment"] += 1
+                self.nodes.nodes[j].data["color"] = IN_TREATMENT_COLOR
+                self.nodes.nodes[j].data["speed"] = IN_TREATMENT_SPEED
+                i["in treatment"] = True
+            else:
+                self.status_count["serious without treatment"] += 1
+        elif serious and in_treatment:
+            i["days in treatment"] += 1/WIN_FPS
+            if i["days in treatment"] > TREATMENT_DAYS:
+                self.status_count["serious in treatment"] += -1
+                self.status_count["serious total"] += -1
+                self.nodes.nodes[j].data["color"] = INFECTED_COLOR
+                self.nodes.nodes[j].data["speed"] = INFECTED_SPEED
+                i["serious"] = False
+                i["in treatment"] = False
+
+    def _update_immune(self, i, j):
+        nodes = self.nodes
+        status_count = self.status_count
+        if i["status"] == "infected":
+            if i["days sick"] < TIME_TILL_IMMUNE:
+                i["days sick"] += 1.0/WIN_FPS
+            else:
+                status_count["infected"] += -1
+                if i["serious"]:
+                    status_count["serious total"] -= 1
+                    i["serious"] = False
+                    if i["in treatment"]:
+                        i["in treatment"] = False
+                        status_count["serious in treatment"] += -1
+                    else:
+                        status_count["serious without treatment"] += -1
+                i["status"] = "immune"
+                status_count["immune"] += 1
+                nodes.nodes[j].data["color"] = IMMUNE_COLOR
+                nodes.nodes[j].data["speed"] = IMMUNE_SPEED
+
+    def _handle_dead(self, infected):
+        node_status = self.node_status
+        status_count = self.status_count
+        nodes = self.nodes
+        for i in infected:
+            j = node_status[i]
+            isrisk = j["risk group"]
+            in_treatment = j["in treatment"]
+            serious = j["serious"]
+            seed = j["current seed"]
+            lethality_no_treat = (SERIOUS_LETHALITY_WITHOUT_TREATMENT*(isrisk == False) + \
+                                    SERIOUS_LETHALITY_WITHOUT_TREATMENT_RISK_GROUP*isrisk)*(in_treatment == False)
+            lethality_normal = (LETHALITY*(isrisk == False) + RISK_GROUP_LETHALITY*isrisk)*(serious == False)
+            if seed < lethality_no_treat + lethality_normal:
+                j["status"] = "dead"
+                nodes.nodes[i].data["color"] = DEAD_COLOR
+                nodes.nodes[i].data["speed"] = DEAD_SPEED
+                status_count["dead"] += 1
+                status_count["infected"] -= 1
+                if in_treatment:
+                    status_count["serious in treatment"] += -1
+                if serious:
+                    self.status_count["serious total"] += -1
+                    if not in_treatment:
+                        status_count["serious without treatment"] += -1
+
+    def _handle_new_infections(self, overlaps):
         status = self.node_status
         nodes = self.nodes
         node_data = self.node_data
         status_count = self.status_count
         for i in overlaps:
-            factor = self.node_data["infected"]["speed"][1]/self.node_data["healthy"]["speed"][1]
-            combo_status = tuple(status[j]["status"] for j in i)
-            if combo_status[0] == "infected":
-                if combo_status[1] == "healthy":
-                    if 1 - random.random() < INFECTION_CHANCE:
-                        status[i[1]]["status"] = "infected"
-                        nodes.nodes[i[1]].data["color"] = node_data["infected"]["color"]
-                        nodes.nodes[i[1]].data["speed"] = [nodes.nodes[i[1]].data["speed"][0]*factor, 
-                                                                nodes.nodes[i[1]].data["speed"][1]*factor]
-                        status_count["infected"] += 1
-                        status_count["healthy"] += -1
-            elif combo_status[1] == "infected":
-                if combo_status[0] == "healthy":
-                    if 1 - random.random() < INFECTION_CHANCE:
-                        status[i[0]]["status"] = "infected"
-                        nodes.nodes[i[0]].data["color"] = node_data["infected"]["color"]
-                        nodes.nodes[i[0]].data["speed"] = [nodes.nodes[i[0]].data["speed"][0]*factor, 
-                                                                nodes.nodes[i[0]].data["speed"][1]*factor]
-                        status_count["infected"] += 1
-                        status_count["healthy"] += -1
+            h_n, i_n = None, None
+            for j in i:
+                if status[j]["status"] == "healthy":
+                    h_n = j
+                elif status[j]["status"] == "infected":
+                    i_n = j
+            if h_n and i_n:
+                seed = status[h_n]["current seed"]
+                factor = self.node_data["infected"]["speed"][1]/self.node_data["healthy"]["speed"][1]
+                if seed < INFECTION_CHANCE:
+                    status[h_n]["status"] = "infected"
+                    nodes.nodes[h_n].data["color"] = node_data["infected"]["color"]
+                    nodes.nodes[h_n].data["speed"] = [nodes.nodes[h_n].data["speed"][0]*factor, 
+                                                    nodes.nodes[h_n].data["speed"][1]*factor]
+                    status_count["infected"] += 1
+                    status_count["healthy"] += -1
 
-    def _serious(self):
-        nodes = self.nodes
+    def _update_status(self, overlaps, infected):
+        self.status_count["serious without treatment"] = 0
+        self.status_count["frames"] += 1
+        self.status_count["days"] = int(self.status_count["frames"]/WIN_FPS)
         node_status = self.node_status
-        status_count = self.status_count
+        for i in overlaps:
+            for j in i:
+                if j not in infected:
+                    self._update_current_seed(node_status[j])
         for i, j in zip(node_status, range(len(node_status))):
-            isrisk = i["risk group"]
-            if not i["serious"] and i["status"] == "infected" and i["days in treatment"] == 0:
-                if random.random() < SERIOUSLY_SICK_CHANCE*(isrisk == False) + SERIOUSLY_SICK_CHANCE_RISK_GROUP*isrisk:
-                    i["serious"] = True
-                    status_count["serious total"] += 1
-                    if status_count["serious in treatment"] < TREATMENT_SPOTS:
-                        status_count["serious in treatment"] += 1
-                        nodes.nodes[j].data["color"] = IN_TREATMENT_COLOR
-                        nodes.nodes[j].data["speed"] = IN_TREATMENT_SPEED
-                        i["in treatment"] = True
-                    else:
-                        status_count["serious without treatment"] += 1
-                        nodes.nodes[j].data["color"] = SERIOUSLY_SICK_COLOR
-                        nodes.nodes[j].data["speed"] = SERIOUS_SPEED
-                else:
-                    if random.random() < LETHALITY*(isrisk == False) + \
-                                         RISK_GROUP_LETHALITY*isrisk:
-                        i["status"] = "dead"
-                        status_count["dead"] += 1
-                        nodes.nodes[j].data["color"] = DEAD_COLOR
-                        nodes.nodes[j].data["speed"] = DEAD_SPEED
-                        status_count["infected"] -= 1
-            elif i["serious"] and i["status"] not in ("healthy", "dead", "immune"):
-                if i["in treatment"] == False:
-                    if random.random() < SERIOUS_LETHALITY_WITHOUT_TREATMENT*(isrisk == False) + \
-                                         SERIOUS_LETHALITY_WITHOUT_TREATMENT_RISK_GROUP*isrisk:
-                        i["status"] = "dead"
-                        status_count["dead"] += 1
-                        nodes.nodes[j].data["color"] = DEAD_COLOR
-                        nodes.nodes[j].data["speed"] = DEAD_SPEED
-                        status_count["infected"] -= 1
-                        status_count["serious without treatment"] += -1
-                        status_count["serious total"] -= 1
-                    else:
-                        if status_count["serious in treatment"] < TREATMENT_SPOTS:
-                            status_count["serious in treatment"] += 1
-                            status_count["serious without treatment"] += -1
-                            nodes.nodes[j].data["color"] = IN_TREATMENT_COLOR
-                            nodes.nodes[j].data["speed"] = IN_TREATMENT_SPEED
-                            i["in treatment"] = True
-                else:
-                    i["days in treatment"] += 1/WIN_FPS
-                    if random.random() < RISK_GROUP_LETHALITY*(isrisk == False) + \
-                                         RISK_GROUP_LETHALITY*isrisk:
-                        i["status"] = "dead"
-                        status_count["dead"] += 1
-                        nodes.nodes[j].data["color"] = DEAD_COLOR
-                        nodes.nodes[j].data["speed"] = DEAD_SPEED   
-                        status_count["infected"] -= 1
-                        status_count["serious in treatment"] += -1
-                        status_count["serious total"] -= 1
-                    else:
-                        if i["days in treatment"] > TREATMENT_DAYS:
-                            #status_count["infected"] += 1
-                            status_count["serious in treatment"] += -1
-                            status_count["serious total"] -= 1
-                            h_speed = SICK_SPEED
-                            i_speed = (h_speed[1] - h_speed[0])*random.random()
-                            i_speed += h_speed[0]
-                            angle = random.random()*2*math.pi
-                            xs = math.cos(angle)*i_speed
-                            ys = math.sin(angle)*i_speed
-                            nodes.nodes[j].data["speed"] = (xs, ys)
-                            nodes.nodes[j].data["color"] = SICK_COLOR
-                            i["status"] = "infected"
-                            i["serious"] = False
-
-    def _update_status(self, overlaps):
-        self._serious()
-        self._infection(overlaps)
-        node_status = self.node_status
-        nodes = self.nodes
-        status_count = self.status_count
-        status_count["frames"] += 1
-        status_count["days"] = int(status_count["frames"]/WIN_FPS)
-        for i, j in zip(node_status, range(len(node_status))):
-            if i["status"] == "infected":
-                if i["days sick"] < TIME_TILL_IMMUNE:
-                    i["days sick"] += 1.0/WIN_FPS
-                else:
-                    status_count["infected"] += -1
-                    if i["serious"]:
-                        status_count["serious total"] -= 1
-                        i["serious"] = False
-                        if i["in treatment"]:
-                            i["in treatment"] = False
-                            status_count["serious in treatment"] -= 1
-                        else:
-                            status_count["serious without treatment"] -= 1
-                    i["status"] = "immune"
-                    status_count["immune"] += 1
-                    nodes.nodes[j].data["color"] = IMMUNE_COLOR
-                    nodes.nodes[j].data["speed"] = IMMUNE_SPEED
+            if i["status"]  not in self.not_handle:
+                self._update_current_seed(i)
+                self._update_serious(i, j)
+                self._update_treatment_status(i, j)
+                self._update_immune(i, j)
+        self._handle_dead(infected)
+        self._handle_new_infections(overlaps)
 
     
 
     def draw(self, dt, func, win):
         if not func.done:
             win.clear()
-            overlaps = func.newframe()
-            self._update_status(overlaps)
+            infected, healthy = self._node_list("infected"), self._node_list("healthy")
+            comp = infected, healthy
+            overlaps = func.newframe(comp)
+            self._update_status(overlaps, infected)
             self._status_draw()
     
     def _status_init(self):

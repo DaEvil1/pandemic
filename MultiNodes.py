@@ -85,6 +85,19 @@ class MultiNodes:
                     if v_dist < i_radius+j_radius:
                         self.overlaps_listed.append((i, j))
     
+    def _list_overlaps_relevant(self, relevant_nodes):
+        nodes = self.nodes
+        for i in relevant_nodes[0]:
+            i_radius = nodes[i].data["radius"]
+            for j in relevant_nodes[1]:
+                j_radius = nodes[j].data["radius"]
+                dist_x = abs(nodes[i].data["pos"][0] - nodes[j].data["pos"][0])
+                dist_y = abs(nodes[i].data["pos"][1] - nodes[j].data["pos"][1])
+                if dist_x < i_radius+j_radius and dist_y < i_radius+j_radius:
+                    v_dist = (dist_x**2 + dist_y**2)**0.5
+                    if v_dist < i_radius+j_radius:
+                        self.overlaps_listed.append((i, j))
+
     def _collision(self):
         nodes = self.nodes
         collisions = []
@@ -129,7 +142,7 @@ class MultiNodes:
         backgr = pyglet.graphics.vertex_list(4, ('v2f', sqr ), ('c3B', col))
         backgr.draw(pyglet.gl.GL_POLYGON)
 
-    def newframe(self):
+    def newframe(self, relevant_nodes = None):
         nodes = self.nodes
         data = self.data
         self.overlaps_listed = []
@@ -147,7 +160,10 @@ class MultiNodes:
         self.frame += 1
         self.batch = pyglet.graphics.Batch()
         if self.list_overlaps:
-            self._list_overlaps()
+            if relevant_nodes:
+                self._list_overlaps_relevant(relevant_nodes)
+            else:
+                self._list_overlaps()
             return self.overlaps_listed
     
 #    def _last_frame(self):
