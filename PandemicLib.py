@@ -39,12 +39,36 @@ class Pandemic:
                 risk_group = False
             self.node_status.append({"status" : status, "days sick" : 0, "risk group" : risk_group, 
                                      "serious" : False, "in treatment" : False, "days in treatment" : 0, 
-                                     "current seed" : 0})
+                                     "current seed" : 0, "speed" : (xs, ys), "self isolated" : False})
             self.status_count[status] += 1
             
 
 
-    
+    def _vaccinate(self):
+        for i, j in zip(range(len(self.nodes.nodes)), self.node_status):
+            if j["status"] == "healthy":
+                if self.status_count["immune"]/len(self.nodes.nodes) < PERCENTAGE_VACCINATED/100:
+                    j["status"] = "immune"
+                    self.status_count["immune"] += 1
+                    self.status_count["healthy"] -= 1
+                    self.nodes.nodes[i].data["color"] = IMMUNE_COLOR
+                    self.nodes.nodes[i].data["speed"] = IMMUNE_SPEED
+
+    def _self_isolate(self):
+        for i, j in zip(range(len(self.nodes.nodes)), self.node_status):
+            if j["status"] == "healthy":
+                if self.status_count["immune"]/len(self.nodes.nodes) < PERCENTAGE_SOCIAL_DISTANCING/100:
+                    j["self isolated"] = True
+                    self.status_count["immune"] += 1
+                    angle = random.random()*2*math.pi
+                    h_speed = SOCIAL_DISTANCING_SPEED
+                    i_speed = (h_speed[1] - h_speed[0])*random.random()
+                    i_speed += h_speed[0]
+                    xs = math.cos(angle)*i_speed
+                    ys = math.sin(angle)*i_speed
+                    self.nodes.nodes[i].data["speed"] = (xs, ys)
+                    j["speed"] = (xs, ys)
+
     def __init__(self, w, h, caption):
         self.node_status = []
         self.d_time = 1.0 / WIN_FPS
@@ -55,11 +79,13 @@ class Pandemic:
         self.nodes.active_collisions = COLLISIONS
         self.nodes.draw_collisions = DRAW_COLLISIONS
         counts = "healthy", "infected", "dead", "immune", "days", "frames", "serious in treatment", \
-                "serious without treatment", "serious total",
+                "serious without treatment", "serious total", "self isolated"
                  
         self.status_count = {i: 0 for i in counts}
         self._generateNodes(w, h, self.node_data["healthy"], "healthy")
         self._generateNodes(w, h, self.node_data["infected"], "infected")
+        self._vaccinate()
+        self._self_isolate()
 
     def _update_current_seed(self, i):
         i["current seed"] = random.random()
@@ -91,7 +117,7 @@ class Pandemic:
                 self.status_count["serious in treatment"] += -1
                 self.status_count["serious total"] += -1
                 self.nodes.nodes[j].data["color"] = INFECTED_COLOR
-                self.nodes.nodes[j].data["speed"] = INFECTED_SPEED
+                self.nodes.nodes[j].data["speed"] = i["speed"]
                 i["serious"] = False
                 i["in treatment"] = False
 
@@ -126,10 +152,10 @@ class Pandemic:
             in_treatment = j["in treatment"]
             serious = j["serious"]
             seed = j["current seed"]
-            lethality_no_treat = (SERIOUS_LETHALITY_WITHOUT_TREATMENT*(isrisk == False) + \
+            lethality_no_threat = (SERIOUS_LETHALITY_WITHOUT_TREATMENT*(isrisk == False) + \
                                     SERIOUS_LETHALITY_WITHOUT_TREATMENT_RISK_GROUP*isrisk)*(in_treatment == False)
             lethality_normal = (LETHALITY*(isrisk == False) + RISK_GROUP_LETHALITY*isrisk)*(serious == False)
-            if seed < lethality_no_treat + lethality_normal:
+            if seed < lethality_no_threat + lethality_normal:
                 j["status"] = "dead"
                 nodes.nodes[i].data["color"] = DEAD_COLOR
                 nodes.nodes[i].data["speed"] = DEAD_SPEED
@@ -160,8 +186,8 @@ class Pandemic:
                 if seed < INFECTION_CHANCE:
                     status[h_n]["status"] = "infected"
                     nodes.nodes[h_n].data["color"] = node_data["infected"]["color"]
-                    nodes.nodes[h_n].data["speed"] = [nodes.nodes[h_n].data["speed"][0]*factor, 
-                                                    nodes.nodes[h_n].data["speed"][1]*factor]
+                    nodes.nodes[h_n].data["speed"] = [status[h_n]["speed"][0]*factor, \
+                                                    status[h_n]["speed"][1]*factor]
                     status_count["infected"] += 1
                     status_count["healthy"] += -1
 
@@ -183,7 +209,9 @@ class Pandemic:
         self._handle_dead(infected)
         self._handle_new_infections(overlaps)
 
-    
+    def _update_speed(self):
+        for i, j in zip(self.nodes.nodes, self.node_status):
+            j["speed"] = i.data["speed"]
 
     def draw(self, dt, func, win):
         if not func.done:
@@ -191,6 +219,7 @@ class Pandemic:
             infected, healthy = self._node_list("infected"), self._node_list("healthy")
             comp = infected, healthy
             overlaps = func.newframe(comp)
+            self._update_speed()
             self._update_status(overlaps, infected)
             self._status_draw()
     
