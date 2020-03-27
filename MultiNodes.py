@@ -165,11 +165,3 @@ class MultiNodes:
             else:
                 self._list_overlaps()
             return self.overlaps_listed
-    
-#    def _last_frame(self):
-
-
-    def on_mouse_press(self, x, y, button, modifiers):
-        if button == 1:
-            self.done = True
-            #self._last_frame()

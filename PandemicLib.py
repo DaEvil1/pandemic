@@ -4,6 +4,7 @@ import math
 import random
 import MultiNodes
 from Pandemic_config import *
+from PandemicGraph import Graph
 from collections import Counter
 
 class Pandemic:
@@ -57,9 +58,9 @@ class Pandemic:
     def _self_isolate(self):
         for i, j in zip(range(len(self.nodes.nodes)), self.node_status):
             if j["status"] == "healthy":
-                if self.status_count["immune"]/len(self.nodes.nodes) < PERCENTAGE_SOCIAL_DISTANCING/100:
+                if self.status_count["self isolated"]/len(self.nodes.nodes) < PERCENTAGE_SOCIAL_DISTANCING/100:
                     j["self isolated"] = True
-                    self.status_count["immune"] += 1
+                    self.status_count["self isolated"] += 1
                     angle = random.random()*2*math.pi
                     h_speed = SOCIAL_DISTANCING_SPEED
                     i_speed = (h_speed[1] - h_speed[0])*random.random()
@@ -71,6 +72,7 @@ class Pandemic:
 
     def __init__(self, w, h, caption):
         self.node_status = []
+        self.captured_data = []
         self.d_time = 1.0 / WIN_FPS
         self.caption = caption
         self.win = (w, h)
@@ -221,7 +223,12 @@ class Pandemic:
             overlaps = func.newframe(comp)
             self._update_speed()
             self._update_status(overlaps, infected)
+            self.captured_data.append(dict(self.status_count))
             self._status_draw()
+            if self.status_count["infected"] == 0:
+                self.done = True
+                pyglet.app.exit()
+                self._graph()
     
     def _status_init(self):
         window = self.window
@@ -243,13 +250,25 @@ class Pandemic:
                 j.text = str(out_str)
                 j.draw()
 
+    def _graph(self):
+        legend = {"dead" : DEAD_COLOR, "immune" : IMMUNE_COLOR, "healthy" : HEALTHY_COLOR, "infected" : INFECTED_COLOR, \
+                  "serious in treatment" : IN_TREATMENT_COLOR, "serious without treatment" : SERIOUSLY_INFECTED_COLOR}
+        Graph(self.captured_data, legend)
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        if button == 1:
+            self.done = True
+            pyglet.app.exit()
+            self._graph()
+            #self._last_frame()
+
     def Start(self):
         w, h = self.win
         self.window = pyglet.window.Window(w, h, visible=False, caption=self.caption, vsync=0)
         self.window.set_visible()
         self.window.double_buffer = False
         self.nodes.data["resolution"] = NODE_RES
-        self.window.on_mouse_press = self.nodes.on_mouse_press
+        self.window.on_mouse_press = self.on_mouse_press
         self._status_init()
         pyglet.clock.schedule_interval(self.draw, self.d_time, self.nodes, self.window)
         pyglet.app.run()
