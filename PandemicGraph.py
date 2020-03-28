@@ -1,6 +1,6 @@
 #PandemicGraph.py
 from PIL import Image, ImageDraw, ImageFont
-import os
+import os, time
 from Pandemic_config import GRAPH_FILE_NAME, GRAPH_FILE_EXT, GRAPH_MARGINS, GRAPH_DIM
 
 class Graph:
@@ -85,15 +85,6 @@ class Graph:
                         self.draw.line(line, fill = color, width = 4)
                     last_point = p2
                     self.drawn_points[i].append((p2[0], p2[1], j))
-    
-    def _save_file(self):
-        i = 0
-        file_n = GRAPH_FILE_NAME + str(i) + GRAPH_FILE_EXT
-        while os.path.exists(file_n):
-            i += 1
-            file_n = GRAPH_FILE_NAME + str(i) + GRAPH_FILE_EXT
-        self.image.save(os.getcwd() + file_n)
-        self.image.show()
 
     def _number_xaxis(self):
         n = 5
@@ -157,6 +148,13 @@ class Graph:
             coord = (20, ycoord - dim[1]/2)
             self.draw.text(coord, name, font=newfont, fill=(0,0,0), anchor='center')
 
+    def _save_file(self):
+        i = 0
+        file_n = GRAPH_FILE_NAME + str(i) + GRAPH_FILE_EXT
+        while os.path.isfile(os.getcwd() + file_n):
+            i += 1
+            file_n = GRAPH_FILE_NAME + str(i) + GRAPH_FILE_EXT
+        self.image.save(os.getcwd() + file_n)
 
     def __init__(self, data, legend):
         self.data = data
