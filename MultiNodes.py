@@ -28,6 +28,7 @@ class MultiNodes:
         new_node.data["speed"] = (speed)
         new_node.data["radius"] = radius
         self.nodes.append(new_node)
+        return len(self.nodes) - 1
 
     def _factor(self, n):
         if n < 0:
