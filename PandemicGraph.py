@@ -1,6 +1,6 @@
 #PandemicGraph.py
 from PIL import Image, ImageDraw, ImageFont
-import os, time
+import os, datetime
 from Pandemic_config import GRAPH_FILE_NAME, GRAPH_FILE_EXT, GRAPH_MARGINS, GRAPH_DIM
 
 class Graph:
@@ -150,24 +150,27 @@ class Graph:
 
     def _save_file(self):
         i = 0
-        file_n = GRAPH_FILE_NAME + str(i) + GRAPH_FILE_EXT
+        now = datetime.datetime.now()
+        timestamp = "--%s-%s-%s--%s-%s--" % (now.year, now.month, now.day, now.hour, now.minute)
+        file_n = GRAPH_FILE_NAME + timestamp + str(i) + GRAPH_FILE_EXT
         while os.path.isfile(os.getcwd() + file_n):
             i += 1
-            file_n = GRAPH_FILE_NAME + str(i) + GRAPH_FILE_EXT
+            file_n = GRAPH_FILE_NAME + str(datetime.date.today()) + "_" + str(i) + GRAPH_FILE_EXT
         self.image.save(os.getcwd() + file_n)
 
     def __init__(self, data, legend):
         self.data = data
         self.legend = legend
         self.font = ImageFont.truetype(font="cambria", size=24)
-        self._find_range()
-        self._cut_extra_data()
-        self._compile_datapoints()
-        self._find_endpoints()
-        self._create_image()
-        self._draw_graph_lines()
-        self._draw_axises()
-        self._number_xaxis()
-        self._number_yaxis()
-        self._make_legend()
-        self._save_file()
+        if self.data[-1]["days"] != 0:
+            self._find_range()
+            self._cut_extra_data()
+            self._compile_datapoints()
+            self._find_endpoints()
+            self._create_image()
+            self._draw_graph_lines()
+            self._draw_axises()
+            self._number_xaxis()
+            self._number_yaxis()
+            self._make_legend()
+            self._save_file()
