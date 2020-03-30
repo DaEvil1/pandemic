@@ -195,7 +195,7 @@ class Pandemic:
     def _update_status(self, overlaps, infected):
         self.status_count["serious without treatment"] = 0
         self.status_count["frames"] += 1
-        self.status_count["days"] = int(self.status_count["frames"]/WIN_FPS)
+        self.status_count["days"] = int(self.status_count["frames"]/(WIN_FPS + 1))
         p_nodes = self.p_nodes
         for i in overlaps:
             for j in i:

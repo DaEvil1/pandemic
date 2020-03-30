@@ -9,18 +9,6 @@ class Graph:
         self.width, self.height = GRAPH_DIM
         self.x_range = [GRAPH_MARGINS[0][0], GRAPH_MARGINS[1][0]]
         self.y_range = [GRAPH_MARGINS[0][1], GRAPH_MARGINS[1][1]]
-    
-    def _cut_extra_data(self):
-        new_data = []
-        temp_data = []
-        last_day = 0
-        for i in self.data:
-            temp_data.append(i)
-            if i["days"] != last_day:
-                last_day = i["days"]
-                new_data += temp_data
-                temp_data = []
-        self.data = new_data
 
     def _compile_datapoints(self):
         self.datapoints = {i : [] for i in self.legend}
@@ -28,6 +16,16 @@ class Graph:
             for j in i:
                 if j in self.legend:
                     self.datapoints[j].append(i[j])
+
+    def _determine_fps(self):
+        self.fps = 0
+        for i in self.data:
+            if i["frames"] > self.fps and i["days"] == 0:
+                self.fps = i["frames"]
+            else:
+                self.key_frame = self.data[-1]["frames"] % self.fps
+                break
+
 
     def _find_endpoints(self):
         self.x_low = self.data[0]["frames"]
@@ -69,21 +67,21 @@ class Graph:
         for i in self.datapoints:
             self.drawn_points[i] = []
             last_point = False
-            last_day = -1
             color = tuple(self.legend[i])
             n_points = len(self.datapoints[i])
-            x_incr = (self.x_range[1] - self.x_range[0])/(self.x_high - self.x_low)
+            points_iter = 0
+            dx = self.x_high - self.key_frame
+            x_incr = (self.x_range[1] - self.x_range[0])/(dx)
             y_incr = (self.y_range[1] - self.y_range[0])/(self.y_high - self.y_low)
             for j, k in zip(self.datapoints[i], range(n_points)):
-                new_day = self.data[k]["days"]
-                if last_day != new_day:
-                    last_day = new_day
+                if self.data[k]["frames"] % self.fps == self.key_frame:
                     p1 = last_point
-                    p2 = (x_incr*k + self.x_range[0], (self.y_high - j)*y_incr + self.y_range[0])
+                    p2 = (x_incr*points_iter + self.x_range[0], (self.y_high - j)*y_incr + self.y_range[0])
                     if last_point:
                         line = [p1, p2]
                         self.draw.line(line, fill = color, width = 4)
                     last_point = p2
+                    points_iter += self.fps
                     self.drawn_points[i].append((p2[0], p2[1], j))
 
     def _number_xaxis(self):
@@ -148,6 +146,21 @@ class Graph:
             coord = (20, ycoord - dim[1]/2)
             self.draw.text(coord, name, font=newfont, fill=(0,0,0), anchor='center')
 
+    def _make_final_value(self):
+        newfont = ImageFont.truetype(font="cambria", size=14)
+        #dim = self.draw.textsize(str(name), font=newfont)
+        #coord = (0, ycoord - dim[1]/2)
+        #self.draw.text(coord, name, font=newfont, fill=(0,0,0), anchor='center')
+        for i, j in zip(self.legend, range(len(self.legend))):
+            ycoord = 50 + j*50
+            final_value = str(self.data[-1][i])
+            name, color = str(i) + ": " + final_value, tuple(self.legend[i])
+            line = [(self.x_range[1] + 20, ycoord + 10), (self.x_range[1] + 130, ycoord + 10)]
+            self.draw.line(line, fill =color, width = 2)
+            dim = self.draw.textsize(name, font=newfont)
+            coord = (self.x_range[1] + 20, ycoord - dim[1]/2)
+            self.draw.text(coord, name, font=newfont, fill=(0,0,0), anchor='left')
+
     def _save_file(self):
         i = 0
         now = datetime.datetime.now()
@@ -155,7 +168,7 @@ class Graph:
         file_n = GRAPH_FILE_NAME + timestamp + str(i) + GRAPH_FILE_EXT
         while os.path.isfile(os.getcwd() + file_n):
             i += 1
-            file_n = GRAPH_FILE_NAME + str(datetime.date.today()) + "_" + str(i) + GRAPH_FILE_EXT
+            file_n = GRAPH_FILE_NAME + timestamp + "_" + str(i) + GRAPH_FILE_EXT
         self.image.save(os.getcwd() + file_n)
 
     def __init__(self, data, legend):
@@ -164,7 +177,7 @@ class Graph:
         self.font = ImageFont.truetype(font="cambria", size=24)
         if self.data[-1]["days"] != 0:
             self._find_range()
-            self._cut_extra_data()
+            self._determine_fps()
             self._compile_datapoints()
             self._find_endpoints()
             self._create_image()
@@ -173,4 +186,5 @@ class Graph:
             self._number_xaxis()
             self._number_yaxis()
             self._make_legend()
+            self._make_final_value()
             self._save_file()

@@ -59,4 +59,4 @@ STATUS_TEXT = True
 GRAPH_FILE_NAME = "\\simulations\\simulation_run"
 GRAPH_FILE_EXT = ".png"
 GRAPH_MARGINS = ((300, 50), (1500, 600))
-GRAPH_DIM = (1700, 650)
+GRAPH_DIM = (1800, 650)
