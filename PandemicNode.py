@@ -75,21 +75,23 @@ class PandemicNode:
         self.data["node group"].nodes[n].data["color"] = SERIOUSLY_INFECTED_COLOR
         self._updateSpeed(SERIOUS_SPEED)
     
-    def inTreatment(self):
+    def inTreatment(self, quarantine_in_treatment):
         n = self.data["node number"]
         self.data["in treatment"] = True
-        self.data["quarantined"] = True
+        if quarantine_in_treatment:
+            self.data["quarantined"] = True
         self.data["node group"].nodes[n].data["color"] = IN_TREATMENT_COLOR
         self._updateSpeed(IN_TREATMENT_SPEED)
     
-    def treatmentOver(self, immune):
+    def treatmentOver(self, immune, keepquarantine = True):
         n = self.data["node number"]
         self.data["in treatment"] = False
         self.data["serious"] = False
         quarantined = self.data["quarantined"]
         if immune:
             self.updateStatus("immune")
-        elif quarantined:
+            self.data["quarantined"] = False
+        elif quarantined and keepquarantine:
             self.quarantined()
         else:
             self.data["node group"].nodes[n].data["color"] = INFECTED_COLOR
@@ -110,7 +112,7 @@ class PandemicNode:
         self.data["status"] = "immune"
         self.data["in treatment"] = False
         self.data["Serious"] = False
-        self.data["quarantined"] =False
+        self.data["quarantined"] = False
         self.data["node group"].nodes[n].data["color"] = IMMUNE_COLOR
         self._updateSpeed(IMMUNE_SPEED)
     

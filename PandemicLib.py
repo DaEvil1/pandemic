@@ -95,9 +95,9 @@ class Pandemic:
         if serious and not in_treatment:
             if self.status_count["serious in treatment"] < TREATMENT_SPOTS:
                 self.status_count["serious in treatment"] += 1
-                if not quarantined:
+                if not quarantined and QUARANTINE_IN_TREATMENT:
                     self.status_count["quarantined"] += 1
-                i.inTreatment()
+                i.inTreatment(QUARANTINE_IN_TREATMENT)
             else:
                 self.status_count["serious without treatment"] += 1
         elif serious and in_treatment:
@@ -105,7 +105,9 @@ class Pandemic:
             if i.data["days in treatment"] > TREATMENT_DAYS:
                 self.status_count["serious in treatment"] += -1
                 self.status_count["serious total"] += -1
-                i.treatmentOver(False)
+                if not KEEP_QUARANTINE_AFTER_TREATMENT and quarantined:
+                    self.status_count["quarantined"] -= 1
+                i.treatmentOver(False, KEEP_QUARANTINE_AFTER_TREATMENT)
 
     def _update_immune(self, i):
         status_count = self.status_count
@@ -115,9 +117,9 @@ class Pandemic:
             else:
                 status_count["infected"] += -1
                 status_count["immune"] += 1
-                i.treatmentOver(True)
                 if i.data["quarantined"]:
                     status_count["quarantined"] += -1
+                i.treatmentOver(True)
 
     def _handle_dead(self, infected):
         p_nodes = self.p_nodes
@@ -129,11 +131,10 @@ class Pandemic:
             serious = j.data["serious"]
             seed = j.seed["dead"]
             quarantined = j.data["quarantined"]
-            lethality_no_threat = (SERIOUS_LETHALITY_WITHOUT_TREATMENT*(isrisk == False) + \
-                                    SERIOUS_LETHALITY_WITHOUT_TREATMENT_RISK_GROUP*isrisk)*(in_treatment == False)
+            lethality_no_treat = (SERIOUS_LETHALITY_WITHOUT_TREATMENT*(isrisk == False) + \
+                                    SERIOUS_LETHALITY_WITHOUT_TREATMENT_RISK_GROUP*isrisk)*(in_treatment == False)*(serious == True)
             lethality_normal = (LETHALITY*(isrisk == False) + RISK_GROUP_LETHALITY*isrisk)*(serious == False)
-            if seed < lethality_no_threat + lethality_normal:
-                j.kill()
+            if seed < lethality_no_treat + lethality_normal:
                 status_count["dead"] += 1
                 status_count["infected"] -= 1
                 if in_treatment:
@@ -144,6 +145,7 @@ class Pandemic:
                     self.status_count["serious total"] += -1
                     if not in_treatment:
                         status_count["serious without treatment"] += -1
+                j.kill()
 
     def _quarantine_nodes(self, infected):
         p_nodes = self.p_nodes

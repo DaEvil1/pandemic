@@ -146,15 +146,15 @@ class Graph:
             coord = (20, ycoord - dim[1]/2)
             self.draw.text(coord, name, font=newfont, fill=(0,0,0), anchor='center')
 
-    def _make_final_value(self):
+    def _make_highest_value(self):
         newfont = ImageFont.truetype(font="cambria", size=14)
         #dim = self.draw.textsize(str(name), font=newfont)
         #coord = (0, ycoord - dim[1]/2)
         #self.draw.text(coord, name, font=newfont, fill=(0,0,0), anchor='center')
         for i, j in zip(self.legend, range(len(self.legend))):
             ycoord = 50 + j*50
-            final_value = str(self.data[-1][i])
-            name, color = str(i) + ": " + final_value, tuple(self.legend[i])
+            highest = str(max(self.datapoints[i]))
+            name, color = str(i) + ": " + highest, tuple(self.legend[i])
             line = [(self.x_range[1] + 20, ycoord + 10), (self.x_range[1] + 130, ycoord + 10)]
             self.draw.line(line, fill =color, width = 2)
             dim = self.draw.textsize(name, font=newfont)
@@ -186,5 +186,5 @@ class Graph:
             self._number_xaxis()
             self._number_yaxis()
             self._make_legend()
-            self._make_final_value()
+            self._make_highest_value()
             self._save_file()
