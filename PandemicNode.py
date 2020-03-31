@@ -11,7 +11,7 @@ class PandemicNode:
                  "dead" : {"color" : DEAD_COLOR, "speed" : DEAD_SPEED, "radius" : DEAD_RADIUS},
                  "quarantined" : {"color" : QUARANTINED_COLOR, "speed" : QUARANTINED_SPEED, "radius" : QUARANTINED_RADIUS}}
 
-    def __init__(self, status, nodegroup, w, h):
+    def __init__(self, status, nodegroup, w, h, resolution):
         angle = random.random()*2*math.pi
         h_speed = self.node_spec[status]["speed"]
         i_speed = (h_speed[1] - h_speed[0])*random.random()
@@ -21,7 +21,7 @@ class PandemicNode:
         pos = [random.randint(0, w), random.randint(0, h)]
         speed = (xs, ys)
         radius = self.node_spec[status]["radius"]
-        node_number = nodegroup.AddNode(speed, color, radius, pos)
+        node_number = nodegroup.AddNode(speed, color, radius, pos, resolution)
         risk_group = True
         self.seed = {"infection" : 0, "serious" : 0, "quarantined" : 0, "dead" : 0}
         if random.random() > RISK_GROUP_PORTION:
@@ -66,13 +66,13 @@ class PandemicNode:
     def updateStatus(self, status):
         n = self.data["node number"]
         self.data["status"] = status
-        self.data["node group"].nodes[n].data["color"] = self.node_spec[status]["color"]
+        self.data["node group"].nodes[n].newColor(self.node_spec[status]["color"])
         self._updateSpeed()
     
     def Serious(self):
         n = self.data["node number"]
         self.data["serious"] = True
-        self.data["node group"].nodes[n].data["color"] = SERIOUSLY_INFECTED_COLOR
+        self.data["node group"].nodes[n].newColor(SERIOUSLY_INFECTED_COLOR)
         self._updateSpeed(SERIOUS_SPEED)
     
     def inTreatment(self, quarantine_in_treatment):
@@ -80,7 +80,7 @@ class PandemicNode:
         self.data["in treatment"] = True
         if quarantine_in_treatment:
             self.data["quarantined"] = True
-        self.data["node group"].nodes[n].data["color"] = IN_TREATMENT_COLOR
+        self.data["node group"].nodes[n].newColor(IN_TREATMENT_COLOR)
         self._updateSpeed(IN_TREATMENT_SPEED)
     
     def treatmentOver(self, immune, keepquarantine = True):
@@ -94,7 +94,7 @@ class PandemicNode:
         elif quarantined and keepquarantine:
             self.quarantined()
         else:
-            self.data["node group"].nodes[n].data["color"] = INFECTED_COLOR
+            self.data["node group"].nodes[n].newColor(INFECTED_COLOR)
             self.updateStatus("infected")
             #self.data["status"] = "infected"
             #self.updateSpeed(INFECTED_SPEED)
@@ -102,7 +102,7 @@ class PandemicNode:
     def infect(self):
         n = self.data["node number"]
         self.data["status"] = "infected"
-        self.data["node group"].nodes[n].data["color"] = INFECTED_COLOR
+        self.data["node group"].nodes[n].newColor(INFECTED_COLOR)
         factor = INFECTED_SPEED[1]/HEALTHY_SPEED[1]
         xs, ys = self.data["speed"][0]*factor, self.data["speed"][1]*factor
         self._updateSpeed((xs, ys))
@@ -113,13 +113,13 @@ class PandemicNode:
         self.data["in treatment"] = False
         self.data["Serious"] = False
         self.data["quarantined"] = False
-        self.data["node group"].nodes[n].data["color"] = IMMUNE_COLOR
+        self.data["node group"].nodes[n].newColor(IMMUNE_COLOR)
         self._updateSpeed(IMMUNE_SPEED)
     
     def quarantined(self):
         n = self.data["node number"]
         self.data["quarantined"] = True
-        self.data["node group"].nodes[n].data["color"] = QUARANTINED_COLOR
+        self.data["node group"].nodes[n].newColor(QUARANTINED_COLOR)
         self._updateSpeed(QUARANTINED_SPEED)
     
     def kill(self):
@@ -130,7 +130,7 @@ class PandemicNode:
         self.data["serious"] = False
         self.data["in treatment"] = False
         self.data["self isolated"] = False
-        self.data["node group"].nodes[n].data["color"] = self.node_spec[status]["color"]
+        self.data["node group"].nodes[n].newColor(self.node_spec[status]["color"])
         self._updateSpeed()
 
     def reSeed(self):

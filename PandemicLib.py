@@ -23,7 +23,7 @@ class Pandemic:
 
     def _generateNodes(self, w, h, node_spec, status):
         for _ in range(node_spec["amount"]):
-            node = PandemicNode.PandemicNode(status, self.nodes, w, h)
+            node = PandemicNode.PandemicNode(status, self.nodes, w, h, NODE_RES)
             self.p_nodes.append(node)
             self.status_count[status] += 1
             
@@ -272,7 +272,7 @@ class Pandemic:
         self.window = pyglet.window.Window(w, h, visible=False, caption=self.caption, vsync=0)
         self.window.set_visible()
         self.window.double_buffer = False
-        self.nodes.data["resolution"] = NODE_RES
+        #self.nodes.data["resolution"] = NODE_RES
         self.window.on_mouse_press = self.on_mouse_press
         self._status_init()
         pyglet.clock.schedule_interval(self.draw, self.d_time, self.nodes, self.window)

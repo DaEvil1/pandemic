@@ -17,13 +17,14 @@ class MultiNodes:
         self.draw_collisions = False
         self.list_overlaps = False
         self.nodes = []
+        self.win = win
         self.done = False
         self.overlaps = []
         self.frame = 0
         self.data = {"resolution" : 12, "win" : win}
     
-    def AddNode(self, speed, color, radius, pos):
-        new_node = Node.Node(radius, color)
+    def AddNode(self, speed, color, radius, pos, resolution):
+        new_node = Node.Node(radius, color, resolution)
         new_node.data["pos"] = pos
         new_node.data["speed"] = (speed)
         new_node.data["radius"] = radius
@@ -156,7 +157,7 @@ class MultiNodes:
             self._draw_collisions()
             self.coll_batch.draw()
         for i in nodes:
-            i.newframe(data["resolution"], self.batch)
+            i.newframe(self.batch)
         self.batch.draw()
         self.frame += 1
         self.batch = pyglet.graphics.Batch()
